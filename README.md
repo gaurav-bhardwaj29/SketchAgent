@@ -80,6 +80,22 @@ Server running at: http://<your-ip-address>:5000
 Open the provided URL in your web browser to interact with the application. Results are saved to ```results/collab_sketching/```.
 Use the text box to change the concept to be drawn.
 
+## Chat-Based Editing
+Interact with SketchAgent through natural language to edit existing sketches!
+To use the chat-based editing interface:
+```
+python chat_and_edit.py
+```
+This will launch a Flask-based web application. Once running, look for the following output in the terminal:
+```
+Server running at: http://<your-ip-address>:5000
+```
+This will launch a Flask-based web application where you can:
+
+- Give textual instructions to edit specific elements
+- Add new elements through conversation
+
+Results are saved to ```results/api_{timestamp}_{session_id}```.
 
 ## Tips:
 * The ```gen_sketch.py``` script produces sketches with variability. Try running it multiple times to explore different outcomes.
