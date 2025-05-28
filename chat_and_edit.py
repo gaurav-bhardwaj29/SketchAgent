@@ -284,9 +284,6 @@ def main() -> None:
 
     PORT  = 5000
     HOST  = "0.0.0.0"          # listen on *every* interface so remote traffic can reach us
-
-    # 2. Best-effort guess of the machine’s outward-facing IP
-    #    (falls back to localhost if we can’t discover one)
     try:
         # The “dummy UDP” trick: no packets leave the box, but we learn
         # which interface would be used to reach the Internet.
