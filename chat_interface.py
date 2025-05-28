@@ -12,7 +12,7 @@ from datetime import datetime
 import uuid
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
-
+from pathlib import Path
 from dotenv import load_dotenv
 from PIL import Image
 from prompts import sketch_first_prompt, system_prompt, gt_example
@@ -86,21 +86,38 @@ def create_args_for_concept(concept):
 
     return args
 
-def load_sketch_data(path_to_data, object_to_edit, cache=False):
-    path_to_sketch_im = f"{path_to_data}/{object_to_edit}/output_{object_to_edit}_canvas.png"
-    path_to_json = f"{path_to_data}/{object_to_edit}/experiment_log.json"
+def load_sketch_data(path_to_data: str, object_to_edit: str, cache: bool = False):
+    """
+    Returns
+    -------
+    sketch_rendered : PIL.Image.Image
+    system_prompt   : str | list
+    msg_history     : list
+    assistant_prompt: str
+    """
+    # 1️⃣  normalise the directory name exactly the same way you did when saving
+    object_dir_name = object_to_edit.replace(" ", "_")   # update to your own slug-rule
+    obj_dir = Path(path_to_data) / object_dir_name
 
-    with open(path_to_json, 'r') as file:
-        experiment_log = json.load(file)
-        if cache:
-            system_prompt = experiment_log[0]["content"][0]["text"]
-        else:
-            system_prompt = experiment_log[0]["content"]
-        assitant_prompt = experiment_log[-1]['content'][0]['text']
-        msg_history = experiment_log[1:]
+    im_path  = obj_dir / f"output_{object_dir_name}_canvas.png"
+    json_path = obj_dir / "experiment_log.json"
 
-    sketch_rendered = Image.open(path_to_sketch_im)
-    return sketch_rendered, system_prompt, msg_history, assitant_prompt
+    if not json_path.exists():
+        raise FileNotFoundError(
+            f"{json_path} not found.\n"
+            f"Available objects in {path_to_data}: "
+            f"{[p.name for p in Path(path_to_data).iterdir()]}"
+        )
+
+    with json_path.open() as f:
+        log = json.load(f)
+
+    system_prompt = log[0]["content"][0]["text"] if cache else log[0]["content"]
+    assistant_prompt = log[-1]["content"][0]["text"]
+    msg_history = log[1:]
+
+    sketch_rendered = Image.open(im_path)
+    return sketch_rendered, system_prompt, msg_history, assistant_prompt
 
 def call_llm(system_message, other_msg, cache, additional_args):
     if cache:
@@ -584,6 +601,7 @@ class SketchApp:
         Method to edit an existing sketch by adding new objects incrementally.
         Each object is added separately and strokes are accumulated.
         """
+        object_to_edit = object_to_edit.replace(" ", "_")  # Normalise the object name
         output_path = f"{path_to_data}/{object_to_edit}/editing_add"
         if not os.path.exists(output_path):
             os.makedirs(output_path)

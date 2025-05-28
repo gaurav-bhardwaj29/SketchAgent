@@ -208,6 +208,7 @@ def edit_sketch():
 
         # Create a simple XML file that just contains the basic sketch
         # This simulates what load_sketch_data expects
+        concept = concept.replace(" ", "_")  # Ensure no spaces in concept name
         output_filename = f"output_{concept}_canvas.png"
         output_path = os.path.join(path_to_data, concept)
         os.makedirs(output_path, exist_ok=True)
@@ -273,11 +274,42 @@ def edit_sketch():
         import traceback
         print(traceback.format_exc())
         return jsonify({"error": str(e)}), 500
+    
+from pathlib import Path
+import socket
 
-if __name__ == '__main__':
-    # Create static directory if it doesn't exist
-    os.makedirs('static/sketches', exist_ok=True)
+def main() -> None:
+    # 1. Make sure the folder for generated sketches exists
+    Path("static/sketches").mkdir(parents=True, exist_ok=True)
 
-    # Run the app
-    app.run(debug=True, host='0.0.0.0', port=5000)
-    print("Server running at http://localhost:5000")
+    PORT  = 5000
+    HOST  = "0.0.0.0"          # listen on *every* interface so remote traffic can reach us
+
+    # 2. Best-effort guess of the machine’s outward-facing IP
+    #    (falls back to localhost if we can’t discover one)
+    try:
+        # The “dummy UDP” trick: no packets leave the box, but we learn
+        # which interface would be used to reach the Internet.
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("8.8.8.8", 80))
+            ip_address = s.getsockname()[0]
+    except OSError:
+        ip_address = "127.0.0.1"
+
+    # 3. Helpful message for *both* access patterns
+    print(
+        f"\n📡  SketchApp server running!\n"
+        f"    • Direct:  http://{ip_address}:{PORT}\n"
+        f"    • Via SSH: ssh -L {PORT}:localhost:{PORT} <user>@{ip_address}\n"
+        f"      then open  →  http://localhost:{PORT}\n"
+    )
+
+    # 4. Start Flask (blocking call)
+    app.run(host=HOST, port=PORT, debug=True)
+
+# ------------------------------------------------------------------
+if __name__ == "__main__":
+    main()
+
+
+
