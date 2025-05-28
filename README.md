@@ -80,6 +80,63 @@ Server running at: http://<your-ip-address>:5000
 Open the provided URL in your web browser to interact with the application. Results are saved to ```results/collab_sketching/```.
 Use the text box to change the concept to be drawn.
 
+## Chat-Based Editing
+
+<br>
+<p align="center">
+<img src="repo_images/interface.png" width="90%"/>  
+
+Interact with SketchAgent through natural language to edit existing sketches! To use the chat-based editing interface:
+
+```bash
+python chat_and_edit.py
+```
+
+This will launch a Flask-based web application. Once running, look for output like:
+
+```
+Server running at: http://<your-ip-address>:5000
+```
+
+You can then:
+
+* Give **textual instructions** to edit specific sketch elements
+* Add new elements through **natural conversation**
+
+Results are saved to:
+
+```
+results/api_{timestamp}_{session_id}
+```
+
+---
+
+### 🧑‍💻 Accessing the Interface
+
+#### ✅ If Running Locally:
+
+Open the printed URL (e.g., `http://127.0.0.1:5000`) in your browser.
+
+#### 🔐 If Running Remotely via SSH:
+
+Use **SSH port forwarding** to access the app from your local browser:
+
+1. On your local machine (not the server), forward the port:
+
+   ```bash
+   ssh -L 5000:localhost:5000 your_username@remote_server_ip
+   ```
+
+2. Once connected and the app is running, open:
+
+   ```
+   http://localhost:5000
+   ```
+
+   in your local browser. This securely tunnels traffic to the remote Flask app.
+
+
+
 
 ## Tips:
 * The ```gen_sketch.py``` script produces sketches with variability. Try running it multiple times to explore different outcomes.
