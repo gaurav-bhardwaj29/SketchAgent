@@ -1,5 +1,5 @@
 import argparse
-import anthropic
+from openai import OpenAI
 import ast
 import cairosvg
 import json
@@ -19,7 +19,7 @@ def call_argparse():
     parser.add_argument('--concept_to_draw', type=str, default="cat")
     parser.add_argument('--seed_mode', type=str, default='deterministic', choices=['deterministic', 'stochastic'])
     parser.add_argument('--path2save', type=str, default=f"results/test")
-    parser.add_argument('--model', type=str, default='claude-3-5-sonnet-20240620')
+    parser.add_argument('--model', type=str, default='gpt-4o')
     parser.add_argument('--gen_mode', type=str, default='generation', choices=['generation', 'completion'])
 
     # Grid params
@@ -57,52 +57,39 @@ class SketchApp:
         # SVG related 
         self.stroke_width = args.stroke_width
         
-        # LLM Setup (you need to provide your ANTHROPIC_API_KEY in your .env file)
-        self.cache = False
+        # LLM Setup (you need to provide your OPENAI_API_KEY in your .env file)
+        # self.cache = False
         self.max_tokens = 3000
         load_dotenv()
-        claude_key = os.getenv("ANTHROPIC_API_KEY")
-        self.client = anthropic.Anthropic(api_key=claude_key)
-        self.model = args.model
+        openai_key = os.getenv("OPENAI_API_KEY")
+        self.client = OpenAI(api_key=openai_key)
+        self.model = "gpt-4o"
         self.input_prompt = sketch_first_prompt.format(concept=args.concept_to_draw, gt_sketches_str=gt_example)
         self.gen_mode = args.gen_mode
         self.seed_mode = args.seed_mode
         
 
     def call_llm(self, system_message, other_msg, additional_args):
-        if self.cache:
-            init_response = self.client.beta.prompt_caching.messages.create(
-                    model=self.model,
-                    max_tokens=self.max_tokens,
-                    system=system_message,
-                    messages=other_msg,
-                    **additional_args
-                )
-        else:
-            init_response = self.client.messages.create(
-                    model=self.model,
-                    max_tokens=self.max_tokens,
-                    system=system_message,
-                    messages=other_msg,
-                    **additional_args
-                )
-        return init_response
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=[{"role": "system", "content": system_message}] + other_msg,
+            max_tokens=self.max_tokens,
+            temperature=additional_args.get("temperature", 0.0),
+            stop=additional_args.get("stop", None)
+        )
+        return response.choices[0].message.content
 
     
     def define_input_to_llm(self, msg_history, init_canvas_str, msg):
-        # other_msg should contain all messgae without the system prompt
-        other_msg = msg_history 
-
         content = []
-        # Claude best practice is image-then-text
         if init_canvas_str is not None:
-            content.append({"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": init_canvas_str}}) 
-
+            content.append({
+                "type": "image_url",
+                "image_url": "data:image/jpeg;base64," + init_canvas_str
+            })
         content.append({"type": "text", "text": msg})
-        if self.cache:
-            content[-1]["cache_control"] = {"type": "ephemeral"}
 
-        other_msg = other_msg + [{"role": "user", "content": content}]
+        other_msg = msg_history + [{"role": "user", "content": content}]
         return other_msg
         
 
@@ -113,21 +100,21 @@ class SketchApp:
         msg_history=[],
         init_canvas_str=None,
         prefill_msg=None,
-        seed_mode="stochastic",
-        stop_sequences=None,
+        # seed_mode="stochastic",
+        stop=None,
         gen_mode="generation"
     ):  
         additional_args = {}
-        if seed_mode == "deterministic":
-            additional_args["temperature"] = 0.0
-            additional_args["top_k"] = 1
+        # if seed_mode == "deterministic":
+            #additional_args["temperature"] = 0.0
+            #additional_args["top_k"] = 1
 
-        if self.cache:
-            system_message = [{
-                "type": "text",
-                "text": system_message,
-                "cache_control": {"type": "ephemeral"}
-            }]
+        # if self.cache:
+        #     system_message = [{
+        #         "type": "text",
+        #         "text": system_message,
+        #         "cache_control": {"type": "ephemeral"}
+        #     }]
 
         # other_msg should contain all messgae without the system prompt
         other_msg = self.define_input_to_llm(msg_history, init_canvas_str, msg) 
@@ -137,13 +124,13 @@ class SketchApp:
                 other_msg = other_msg + [{"role": "assistant", "content": f"{prefill_msg}"}]
             
         # In case of stroke by stroke generation
-        if stop_sequences:
-            additional_args["stop_sequences"]= [stop_sequences]
+        if stop:
+            additional_args["stop"]= stop
         else:
-            additional_args["stop_sequences"]= ["</answer>"]
+            additional_args["stop"]= ["</answer>"]
  
         response = self.call_llm(system_message, other_msg, additional_args)
-        content = response.content[0].text
+        content = response
         
         if gen_mode == "completion":
             other_msg = other_msg[:-1] # remove initial assistant prompt
@@ -173,7 +160,7 @@ class SketchApp:
         print("Calling LLM...")
         
         add_args = {}
-        add_args["stop_sequences"] = f"</answer>" 
+        add_args["stop"] = "</answer>" 
 
         msg_history = []
         init_canvas_str = None # self.init_canvas_str
@@ -183,7 +170,7 @@ class SketchApp:
             system_message=system_prompt.format(res=self.res),
             msg_history=msg_history,
             init_canvas_str=init_canvas_str,
-            seed_mode=self.seed_mode,
+            #seed_mode=self.seed_mode,
             gen_mode=self.gen_mode,
             **add_args
         )
